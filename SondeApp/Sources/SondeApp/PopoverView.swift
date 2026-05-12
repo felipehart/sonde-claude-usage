@@ -683,6 +683,7 @@ struct PopoverView: View {
             .preferredColorScheme(colorScheme)
             .onAppear {
                 dismissedBanners.removeAll()
+                Task { await viewModel.refresh() }
             }
         }
     }
