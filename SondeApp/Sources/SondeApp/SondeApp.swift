@@ -8,10 +8,6 @@ struct SondeMenuBarApp: App {
     @AppStorage("pollInterval") private var pollInterval: Double = 30
 
     init() {
-        UserDefaults.standard.register(defaults: [
-            "appearanceMode": "auto",
-            "menuBarTimerMode": "5h_left",
-        ])
         Self.killOtherInstances()
         NotificationManager.shared.toastHandler = { message, icon in
             ToastManager.shared.show(message: message, icon: icon)
@@ -45,7 +41,13 @@ struct SondeMenuBarApp: App {
             PopoverView(viewModel: viewModel)
         } label: {
             MenuBarLabel(viewModel: viewModel)
-                .onAppear { viewModel.startPolling(interval: pollInterval) }
+                .onAppear {
+                    UserDefaults.standard.register(defaults: [
+                        "appearanceMode": "auto",
+                        "menuBarTimerMode": "5h_left",
+                    ])
+                    viewModel.startPolling(interval: pollInterval)
+                }
                 .onDisappear { viewModel.stopPolling() }
                 .onChange(of: pollInterval) { newInterval in
                     viewModel.startPolling(interval: newInterval)
