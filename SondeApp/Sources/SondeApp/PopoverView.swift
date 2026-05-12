@@ -357,15 +357,10 @@ private struct ModelPill: View {
 
 private struct PulseDot: View {
     var theme: PopoverTheme = .system
-    @State private var pulsing = false
-
     var body: some View {
         Circle()
             .fill(theme.lowUtilColor)
             .frame(width: 5, height: 5)
-            .opacity(pulsing ? 1.0 : 0.3)
-            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
     }
 }
 
@@ -483,11 +478,10 @@ private struct LiveSessionStrip: View {
 
                 Spacer()
 
-                Text(liveTimer)
+                Text("Atualizado: \(liveTimer)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(theme.textSecondary)
                     .glowText(theme, radius: 2)
-                    .contentTransition(.numericText())
 
                 PulseDot(theme: theme)
             }
@@ -628,9 +622,8 @@ struct PopoverView: View {
                     LiveSessionStrip(
                         theme: theme,
                         session: viewModel.session,
-                        liveTimer: viewModel.liveSessionDuration
+                        liveTimer: viewModel.lastUpdatedLabel
                     )
-                    .animation(.easeInOut(duration: 0.3), value: hasActiveSession)
 
                     Divider().overlay(theme.dividerColor)
                 }
@@ -689,9 +682,7 @@ struct PopoverView: View {
             }
             .preferredColorScheme(colorScheme)
             .onAppear {
-                // Reset dismissed banners each time popover appears
                 dismissedBanners.removeAll()
-                Task { await viewModel.refresh() }
             }
         }
     }

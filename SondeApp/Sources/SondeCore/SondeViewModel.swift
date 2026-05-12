@@ -42,7 +42,6 @@ public final class SondeViewModel: ObservableObject {
     @Published public var dailyClaudeCost: Double = 0
     @Published public var dailyCodexCost: Double = 0
 
-    // Live session timer
     @Published public var liveSessionDuration: String = "--"
 
     // Cost/time checkpoint ("mark") — user can reset to track from a point
@@ -92,8 +91,6 @@ public final class SondeViewModel: ObservableObject {
     private let promoDetector = PromoDetector()
     private let usageHistoryTracker = UsageHistoryTracker()
     private var pollTimer: Timer?
-    private var sessionTimer: Timer?
-    private var sessionStartTime: Date?
     private var hasCheckedForUpdate = false
     private var hasShownCacheToast = false
 
@@ -103,7 +100,6 @@ public final class SondeViewModel: ObservableObject {
 
     deinit {
         pollTimer?.invalidate()
-        sessionTimer?.invalidate()
     }
 
     /// Set a checkpoint — track cost/time from this moment.
@@ -138,48 +134,13 @@ public final class SondeViewModel: ObservableObject {
     public func stopPolling() {
         pollTimer?.invalidate()
         pollTimer = nil
-        sessionTimer?.invalidate()
-        sessionTimer = nil
     }
 
-    private func startSessionTimer() {
-        sessionTimer?.invalidate()
-        sessionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                guard let start = self.sessionStartTime else { return }
-                let elapsed = Int(Date().timeIntervalSince(start))
-                let h = elapsed / 3600
-                let m = (elapsed % 3600) / 60
-                let s = elapsed % 60
-                let new: String
-                if h > 0 {
-                    new = String(format: "%dh %02dm %02ds", h, m, s)
-                } else {
-                    new = String(format: "%dm %02ds", m, s)
-                }
-                if self.liveSessionDuration != new { self.liveSessionDuration = new }
-
-                // Update mark timer
-                if self.markActive, let markStart = self.markDate {
-                    let markElapsed = Int(Date().timeIntervalSince(markStart))
-                    let mh = markElapsed / 3600
-                    let mm = (markElapsed % 3600) / 60
-                    let ms = markElapsed % 60
-                    let markStr: String
-                    if mh > 0 {
-                        markStr = String(format: "%dh %02dm %02ds", mh, mm, ms)
-                    } else {
-                        markStr = String(format: "%dm %02ds", mm, ms)
-                    }
-                    if self.timeSinceMark != markStr { self.timeSinceMark = markStr }
-
-                    let currentCost = self.session.sessionCost ?? 0
-                    let delta = max(0, currentCost - self.markCost)
-                    if self.costSinceMark != delta { self.costSinceMark = delta }
-                }
-            }
-        }
+    public var lastUpdatedLabel: String {
+        guard let date = lastUpdated else { return "--" }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        return fmt.string(from: date)
     }
 
     /// Build a JSON string summarising current usage data for export.
@@ -416,16 +377,6 @@ public final class SondeViewModel: ObservableObject {
         )
         let newHistory = usageHistoryTracker.getHistory()
         if dailyHistory != newHistory { dailyHistory = newHistory }
-
-        // Live session timer — derive start time from session duration
-        if newSession.modelName != nil {
-            if let durationMs = newSession.sessionDurationMs, durationMs > 0 {
-                sessionStartTime = Date().addingTimeInterval(-Double(durationMs) / 1000.0)
-            } else {
-                sessionStartTime = Date()
-            }
-            startSessionTimer()
-        }
 
         if fhChanged || sdChanged {
             NotificationManager.shared.checkAndNotify(

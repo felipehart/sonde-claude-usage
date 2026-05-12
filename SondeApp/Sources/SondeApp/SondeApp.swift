@@ -8,6 +8,10 @@ struct SondeMenuBarApp: App {
     @AppStorage("pollInterval") private var pollInterval: Double = 30
 
     init() {
+        UserDefaults.standard.register(defaults: [
+            "appearanceMode": "auto",
+            "menuBarTimerMode": "5h_left",
+        ])
         Self.killOtherInstances()
         NotificationManager.shared.toastHandler = { message, icon in
             ToastManager.shared.show(message: message, icon: icon)
