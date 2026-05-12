@@ -1,4 +1,4 @@
-.PHONY: build bundle install install-fonts launch dmg clean
+.PHONY: build bundle install install-fonts launch dmg clean dev kill reload
 
 BINARY_NAME = SondeApp
 FONT_DIR = ../fonts
@@ -12,6 +12,41 @@ INFO_PLIST_SRC = Sources/SondeApp/Info.plist
 
 build:
 	swift build -c release
+
+# Fast dev cycle: debug build (no optimizations) + kill existing + relaunch
+dev:
+	swift build
+	@$(MAKE) --no-print-directory _bundle_debug
+	@$(MAKE) --no-print-directory kill
+	open $(APP_BUNDLE)
+	@echo "Launched (debug build)."
+
+# Kill all running instances
+kill:
+	@pkill -x SondeApp 2>/dev/null || true
+
+# Restart without rebuilding
+reload: kill
+	open $(APP_BUNDLE)
+	@echo "Relaunched."
+
+_bundle_debug:
+	mkdir -p $(MACOS_DIR) $(RESOURCES_DIR)
+	cp "$$(swift build --show-bin-path)/$(BINARY_NAME)" $(MACOS_DIR)/$(BINARY_NAME)
+	cp AppIcon.icns $(RESOURCES_DIR)/AppIcon.icns
+	-cp -R "$$(swift build --show-bin-path)/SondeApp_SondeApp.bundle" $(RESOURCES_DIR)/ 2>/dev/null
+	plutil -convert xml1 $(INFO_PLIST_SRC) -o $(CONTENTS_DIR)/Info.plist
+	/usr/libexec/PlistBuddy -c "Set :LSUIElement true" $(CONTENTS_DIR)/Info.plist 2>/dev/null || \
+		/usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" $(CONTENTS_DIR)/Info.plist
+	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier dev.sonde.app" $(CONTENTS_DIR)/Info.plist 2>/dev/null || \
+		/usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string dev.sonde.app" $(CONTENTS_DIR)/Info.plist
+	/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $(BINARY_NAME)" $(CONTENTS_DIR)/Info.plist 2>/dev/null || \
+		/usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string $(BINARY_NAME)" $(CONTENTS_DIR)/Info.plist
+	/usr/libexec/PlistBuddy -c "Set :CFBundlePackageType APPL" $(CONTENTS_DIR)/Info.plist 2>/dev/null || \
+		/usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" $(CONTENTS_DIR)/Info.plist
+	/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" $(CONTENTS_DIR)/Info.plist 2>/dev/null || \
+		/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" $(CONTENTS_DIR)/Info.plist
+	codesign --force --sign - --entitlements Sources/SondeApp/SondeApp.entitlements $(MACOS_DIR)/$(BINARY_NAME)
 
 bundle: build
 	@echo "Creating app bundle..."
